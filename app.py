@@ -321,7 +321,6 @@ with st.sidebar:
 # ================= 8. 主内容区 (Tabs) =================
 
 tab_diagnosis, tab_explain, tab_about = st.tabs(["🩺 AI Diagnosis", "📊 Analysis", "ℹ️ About"])
-
 # ------ 1. 诊断 (修改版，修复 dict 报错) ------
 with tab_diagnosis:
     if submit_btn:
