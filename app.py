@@ -322,15 +322,37 @@ with st.sidebar:
 
 tab_diagnosis, tab_explain, tab_about = st.tabs(["🩺 AI Diagnosis", "📊 Analysis", "ℹ️ About"])
 
-# ------ 1. 诊断 ------
+# ------ 1. 诊断 (修改版，修复 dict 报错) ------
 with tab_diagnosis:
     if submit_btn:
-        model = models[selected_model_name]
+        # 1. 获取加载的对象
+        loaded_object = models[selected_model_name]
         
-        if model is None:
+        if loaded_object is None:
             st.error(f"❌ Error: Model file for {selected_model_name} not found.")
         else:
-            # 收集所有输入变量
+            # ================== 修复核心代码开始 ==================
+            # 检查加载的是不是字典，如果是，尝试提取真正的模型对象
+            if isinstance(loaded_object, dict):
+                # 尝试通过常见的键名提取模型
+                possible_keys = ['model', 'classifier', 'clf', 'estimator', 'best_estimator']
+                model = None
+                for key in possible_keys:
+                    if key in loaded_object:
+                        model = loaded_object[key]
+                        break
+                
+                # 如果找不到模型，报错并打印字典里的键，方便调试
+                if model is None:
+                    st.error(f"❌ Error: loaded .pkl is a dictionary, but model key not found.")
+                    st.write(f"Available keys in file: {list(loaded_object.keys())}")
+                    st.stop()
+            else:
+                # 如果不是字典，说明它直接就是模型
+                model = loaded_object
+            # ================== 修复核心代码结束 ==================
+
+            # 2. 准备数据
             full_data = {
                 'chewing': chewing, 
                 'choking': choking,
@@ -360,12 +382,15 @@ with tab_diagnosis:
                     input_df = raw_df.reindex(columns=FEATURES_RF)
                     final_input = input_df
                 
+                # 3. 进行预测
                 prediction = model.predict(final_input)[0]
+                
                 if hasattr(model, 'predict_proba'):
                     prob_pos = model.predict_proba(final_input)[0][1]
                 else:
                     prob_pos = float(prediction)
                 
+                # 4. 显示结果
                 st.markdown(f"### Diagnosis Result: {selected_model_name}")
                 col_res1, col_res2 = st.columns([1, 1.5])
                 with col_res1:
@@ -414,10 +439,11 @@ with tab_diagnosis:
 
             except Exception as e:
                 st.error(f"Analysis Error: {e}")
-                st.write("Input columns:", final_input.columns.tolist())
+                st.write("Input Data Columns:", final_input.columns.tolist())
+                # 打印模型类型帮助调试
+                st.write("Model Type:", type(model))
     else:
         st.info("👈 请在左侧输入数据并点击 'Run Prediction'")
-
 # ------ 2. 分析 ------
 with tab_explain:
     st.markdown("### 🔍 Feature Importance")
