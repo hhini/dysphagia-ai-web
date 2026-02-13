@@ -14,16 +14,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ================= 2. HTML 文本定义 (无缩进) =================
+# ================= 2. HTML 文本定义 (更新模型描述) =================
 
 HTML_ANALYSIS_REPORT = """
 <div class="css-card">
     <h3 style="color:#1e3a8a;">📊 深度模型分析报告</h3>
     <h4>1. 综合性能指标</h4>
     <ul>
-        <li><strong>区分能力 (AUC)：</strong> 两个模型的 AUC 值均表现优异，表明它们对“患病”和“不患病”人群有极强的区分能力。</li>
-        <li><strong>准确率与稳定性：</strong> 随机森林模型引入了“中药服用史”作为第10个特征，在处理复杂交互关系上可能略优于逻辑回归。</li>
-        <li><strong>临床应用：</strong> 逻辑回归仅需9个核心特征，计算简便，适合快速筛查；随机森林增加了用药史维度，适合更精细的评估。</li>
+        <li><strong>区分能力 (AUC)：</strong> 两个模型均经过临床数据验证，能有效区分吞咽障碍高风险与低风险人群。</li>
+        <li><strong>模型差异：</strong> 随机森林模型纳入了身高、病史（脑血管病、抗凝药）等更多维度，适合全面评估；逻辑回归侧重于核心功能的快速筛查。</li>
     </ul>
     <h4>2. 模型特性对比</h4>
     <table style="width:100%; border-collapse: collapse; margin-top: 10px;">
@@ -34,13 +33,13 @@ HTML_ANALYSIS_REPORT = """
       </tr>
       <tr>
         <td style="padding: 8px; border: 1px solid #ddd;"><strong>特征数量</strong></td>
-        <td style="padding: 8px; border: 1px solid #ddd;"><strong>9项</strong> (极简核心指标)</td>
-        <td style="padding: 8px; border: 1px solid #ddd;"><strong>10项</strong> (增加中药服用史)</td>
+        <td style="padding: 8px; border: 1px solid #ddd;"><strong>10项</strong> (包含基本身体指标与认知功能)</td>
+        <td style="padding: 8px; border: 1px solid #ddd;"><strong>14项</strong> (增加疾病史、抗凝药、身高等详细指标)</td>
       </tr>
       <tr>
-        <td style="padding: 8px; border: 1px solid #ddd;"><strong>解释性</strong></td>
-        <td style="padding: 8px; border: 1px solid #ddd;">高 (线性关系清晰)</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">中 (非线性交互强)</td>
+        <td style="padding: 8px; border: 1px solid #ddd;"><strong>适用场景</strong></td>
+        <td style="padding: 8px; border: 1px solid #ddd;">快速筛查，关注核心功能</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">精细化评估，考虑多重共病影响</td>
       </tr>
     </table>
 </div>
@@ -49,11 +48,11 @@ HTML_ANALYSIS_REPORT = """
 HTML_ABOUT_SYSTEM = """
 <div class="css-card">
     <h2 style="color: #1e3a8a;">🏥 关于本系统 (About)</h2>
-    <p>本系统基于最新的临床数据训练，旨在辅助医护人员快速评估老年吞咽障碍风险。</p>
+    <p>本系统基于老年医学临床数据训练，旨在辅助医护人员评估吞咽障碍风险。</p>
     <h4>🛠️ 模型配置</h4>
     <ul>
-        <li><strong>Logistic Regression (逻辑回归)：</strong> 使用 9 项核心临床指标（如BMI、牙齿、认知状态等）。</li>
-        <li><strong>Random Forest (随机森林)：</strong> 在核心指标基础上增加了“中药及中成药服用史”，共 10 项特征。</li>
+        <li><strong>Logistic Regression (逻辑回归)：</strong> 使用 10 项核心指标（咀嚼、呛咳、牙齿、进食、年龄、体重、服药种类、MMSE、BMI、衰弱）。</li>
+        <li><strong>Random Forest (随机森林)：</strong> 在逻辑回归基础上增加了“抗凝药使用”、“身高”、“脑血管病(CVD)”及“疾病种类数”，共 14 项特征。</li>
     </ul>
     <h4>⚠️ 免责声明 (Disclaimer)</h4>
     <p style="color: #666;">
@@ -65,7 +64,7 @@ HTML_ABOUT_SYSTEM = """
 </div>
 """
 
-# ================= 3. CSS 样式 (适配 Radio Button) =================
+# ================= 3. CSS 样式 (保持不变) =================
 st.markdown("""
 <style>
     /* 全局设置 */
@@ -138,29 +137,53 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ================= 4. 特征定义 =================
+# ================= 4. 特征定义 (严格按照提供的顺序) =================
 
+# 逻辑回归 (10个特征)
 FEATURES_LR = [
-    'chewing', 'number_of_teeth', 'choking', 'eating', 
-    'age', 'weight', 'frail', 'BMI', 'MMSE'
+    'chewing',               # 1. 咀嚼障碍
+    'choking',               # 2. 呛咳史
+    'number_of_teeth',       # 3. 牙齿数量
+    'eating',                # 4. 进食情况
+    'age',                   # 5. 年龄
+    'weight',                # 6. 体重
+    'number_of_drug_types',  # 7. 药物种类数
+    'MMSE',                  # 8. 认知功能
+    'BMI',                   # 9. BMI
+    'frail'                  # 10. 衰弱状态
 ]
 
+# 随机森林 (14个特征)
 FEATURES_RF = [
-    'chewing', 'number_of_teeth', 'choking', 'eating', 
-    'age', 'weight', 'frail', 'BMI', 'MMSE', 
-    'zhongyaojizhongchengyao'
+    'chewing',               # 1
+    'choking',               # 2
+    'number_of_teeth',       # 3
+    'eating',                # 4
+    'age',                   # 5
+    'weight',                # 6
+    'number_of_drug_types',  # 7
+    'MMSE',                  # 8
+    'BMI',                   # 9
+    'frail',                 # 10
+    'kangningyao',           # 11. 抗凝药
+    'hight',                 # 12. 身高 (注意变量名是 hight)
+    'CVD',                   # 13. 脑血管疾病
+    'number_of_diseases'     # 14. 疾病种类数
 ]
 
 # ================= 5. 工具函数 =================
 
 def manual_standardization(df):
-    """仅对连续变量进行标准化"""
+    """仅对逻辑回归中已知的连续变量进行标准化"""
+    # 注意：如果 number_of_drug_types 等新变量需要标准化，请在此处添加对应的 mean/std
     df_scaled = df.copy()
     stats_config = {
         'number_of_teeth': {'mean': 18.0,  'std': 9.299115},
         'weight':          {'mean': 60.0,  'std': 9.572267},
         'BMI':             {'mean': 23.0,  'std': 3.310996},
         'age':             {'mean': 75.0,  'std': 7.154127}
+        # 如果需要对 number_of_drug_types 进行标准化，请取消注释并填入数值
+        # 'number_of_drug_types': {'mean': X.X, 'std': Y.Y},
     }
     for col, stats in stats_config.items():
         if col in df_scaled.columns:
@@ -182,15 +205,14 @@ def load_models():
 
 models = load_models()
 
-# ================= 6. 主界面 (Banner 在顶部) =================
+# ================= 6. 主界面 =================
 
 try:
     st.image("assets/banner.png", use_container_width=True)
 except:
-    # 如果找不到图片，显示一个带背景色的标题块
     st.markdown("""<div style="background: linear-gradient(90deg, #1e3a8a 0%, #4361ee 100%); padding: 30px; border-radius: 12px; color: white; text-align: center; margin-bottom: 25px;"><h1>Dysphagia Prediction System</h1></div>""", unsafe_allow_html=True)
 
-# ================= 7. 侧边栏输入 (优化交互) =================
+# ================= 7. 侧边栏输入 (更新控件) =================
 with st.sidebar:
     try:
         st.image("assets/logo.png", width=180)
@@ -207,11 +229,11 @@ with st.sidebar:
     is_rf = selected_model_name == "Random Forest"
     
     with st.form("main_form"):
-        # --- 1. 身体测量 (使用 Number Input 带加减号) ---
-        st.markdown("### 1. Measurements (身体测量)")
+        # --- 1. 身体测量与基本信息 ---
+        st.markdown("### 1. Basic Info (基本信息)")
         col1, col2 = st.columns(2)
-        # step=1 确保出现加减按钮
-        age = col1.number_input("Age (年龄)", min_value=20, max_value=110, value=75, step=1)
+        age = col1.number_input("Age (年龄)", min_value=20, max_value=120, value=75, step=1)
+        # Height 即使LR不用，也需要用来计算BMI
         hight = col2.number_input("Height (cm)", min_value=100, max_value=220, value=160, step=1)
         
         col3, col4 = st.columns(2)
@@ -222,55 +244,76 @@ with st.sidebar:
         BMI = bmi_val
         col4.markdown(f"<div style='padding-top:35px; color:#4361ee; font-weight:bold;'>BMI: {bmi_val:.1f}</div>", unsafe_allow_html=True)
 
-        # --- 2. 核心临床特征 (使用 Radio Button 增强可视性) ---
+        # --- 2. 核心症状 (咀嚼/呛咳/牙齿/进食) ---
         st.markdown("---")
-        st.markdown("### 2. Clinical Status (临床状态)")
+        st.markdown("### 2. Oral & Feeding (口腔与进食)")
         
-        # 牙齿 - 使用 Number Input 方便加减
-        number_of_teeth = st.number_input("Number of Teeth (牙齿数量)", min_value=0, max_value=32, value=20, step=1)
-        
-        st.markdown("---")
-        # 咀嚼 - 使用 Radio Button (水平排列)，用户一眼就能看到选了 Yes 还是 No
+        # 咀嚼 (Chewing)
         chewing = st.radio(
-            "Chewing Difficulty (咀嚼障碍)", 
+            "1. Chewing Difficulty (咀嚼障碍)", 
             [0, 1], 
-            format_func=lambda x: "无 (No)" if x==0 else "有 (Yes)",
+            format_func=lambda x: "0: 无 (No)" if x==0 else "1: 有 (Yes)",
             horizontal=True
         )
-        
-        # 呛咳 - Radio Button
-        choking = st.radio(
-            "Choking History (呛咳史)", 
-            [0, 1], 
-            format_func=lambda x: "无 (No)" if x==0 else "有 (Yes)",
-            horizontal=True
-        )
-        
-        # 进食 - Selectbox (选项较多，Radio太占地，但Selectbox已修复可见性)
-        c_a3, c_a4 = st.columns(2)
-        eat_map = {0: "良好 (Good)", 1: "一般 (Fair)", 2: "差 (Poor)"}
-        eating = c_a3.selectbox("Eating (进食情况)", [0, 1, 2], format_func=lambda x: eat_map[x])
-        
-        frail_map = {0: "无 (None)", 1: "衰弱前期 (Pre)", 2: "衰弱 (Frail)"}
-        frail = c_a4.selectbox("Frailty (衰弱状态)", [0, 1, 2], format_func=lambda x: frail_map[x])
-        
-        # 认知
-        mmse_map = {0:"正常", 1:"轻度障碍", 2:"中度障碍", 3:"重度障碍"}
-        MMSE = st.selectbox("MMSE (认知功能)", [0, 1, 2, 3], format_func=lambda x: mmse_map[x])
 
-        # --- 3. 随机森林专属特征 ---
-        zhongyaojizhongchengyao = 0
+        # 呛咳 (Choking)
+        choking = st.radio(
+            "2. Choking History (呛咳史)", 
+            [0, 1], 
+            format_func=lambda x: "0: 无 (No)" if x==0 else "1: 有 (Yes)",
+            horizontal=True
+        )
+
+        c_oral1, c_oral2 = st.columns(2)
+        # 牙齿数量
+        number_of_teeth = c_oral1.number_input("3. Teeth Count (牙齿数量)", min_value=0, max_value=32, value=20, step=1)
+        
+        # 进食情况
+        eat_map = {0: "0: 良好", 1: "1: 一般", 2: "2: 差"}
+        eating = c_oral2.selectbox("4. Eating Status (进食情况)", [0, 1, 2], format_func=lambda x: eat_map[x])
+
+        # --- 3. 临床状态 (MMSE/衰弱/药物) ---
+        st.markdown("---")
+        st.markdown("### 3. Clinical Status (临床状态)")
+        
+        mmse_map = {0:"0: 正常", 1:"1: 轻度障碍", 2:"2: 中度障碍"} # 无重度(3)
+        MMSE = st.selectbox("MMSE (认知功能)", [0, 1, 2], format_func=lambda x: mmse_map[x])
+
+        frail_map = {0: "0: 无衰弱", 1: "1: 衰弱前期", 2: "2: 衰弱"}
+        frail = st.selectbox("Frailty (衰弱状态)", [0, 1, 2], format_func=lambda x: frail_map[x])
+        
+        # 药物种类数 (LR 和 RF 都用)
+        number_of_drug_types = st.number_input("Drugs Count (长期服用药物种类数)", min_value=0, max_value=20, value=3, step=1)
+
+        # --- 4. 随机森林专属特征 (11-14) ---
+        kangningyao = 0
+        CVD = 0
+        number_of_diseases = 0
+        
         if is_rf:
             st.markdown("---")
-            st.markdown("### 3. Medication (用药)")
-            # 中药 - Radio Button
-            zhongyaojizhongchengyao = st.radio(
-                "TCM Usage (中药/中成药)", 
+            st.markdown("### 4. History (病史 - RF模型专用)")
+            
+            # 11. 抗凝药
+            kangningyao = st.radio(
+                "Anticoagulant Use (抗凝药)", 
                 [0, 1], 
-                format_func=lambda x: "无 (No)" if x==0 else "有 (Yes)",
-                horizontal=True,
-                help="是否正在服用中药或中成药"
+                format_func=lambda x: "0: 无 (No)" if x==0 else "1: 有 (Yes)",
+                horizontal=True
             )
+            
+            # 13. 脑血管疾病
+            CVD = st.radio(
+                "CVD (脑血管疾病)", 
+                [0, 1], 
+                format_func=lambda x: "0: 无 (No)" if x==0 else "1: 有 (Yes)",
+                horizontal=True
+            )
+            
+            # 14. 疾病种类数
+            number_of_diseases = st.number_input("Diseases Count (疾病种类数)", min_value=0, max_value=20, value=2, step=1)
+            
+            # 12. hight 已在上方输入
 
         st.markdown("---")
         submit_btn = st.form_submit_button("🚀 Run Prediction")
@@ -287,25 +330,33 @@ with tab_diagnosis:
         if model is None:
             st.error(f"❌ Error: Model file for {selected_model_name} not found.")
         else:
+            # 收集所有输入变量
             full_data = {
                 'chewing': chewing, 
+                'choking': choking,
                 'number_of_teeth': number_of_teeth, 
-                'choking': choking, 
                 'eating': eating, 
                 'age': age, 
-                'weight': weight, 
-                'frail': frail, 
-                'BMI': BMI, 
+                'weight': weight,
+                'number_of_drug_types': number_of_drug_types,
                 'MMSE': MMSE,
-                'zhongyaojizhongchengyao': zhongyaojizhongchengyao
+                'BMI': BMI, 
+                'frail': frail, 
+                'kangningyao': kangningyao,
+                'hight': hight,
+                'CVD': CVD,
+                'number_of_diseases': number_of_diseases
             }
             raw_df = pd.DataFrame([full_data])
             
             try:
+                # 根据模型选择不同的特征子集
                 if not is_rf:
+                    # 逻辑回归：取前10个特征
                     input_df = raw_df.reindex(columns=FEATURES_LR)
                     final_input = manual_standardization(input_df)
                 else:
+                    # 随机森林：取14个特征
                     input_df = raw_df.reindex(columns=FEATURES_RF)
                     final_input = input_df
                 
@@ -335,7 +386,7 @@ with tab_diagnosis:
                     if prob_pos > 0.5:
                         st.markdown(f"""
 <div class="css-card" style="border-left: 6px solid #ef233c; background-color: #fff5f5;">
-    <h2 style="color: #ef233c !important; margin-top:0;">⚠️ High Risk Detected</h2>
+    <h2 style="color: #ef233c !important; margin-top:0;">⚠️ High Risk Detected (高风险)</h2>
     <p style="font-size: 1.1em;">Probability: <strong>{prob_pos*100:.1f}%</strong></p>
     <hr>
     <p><strong>🚨 建议与干预：</strong></p>
@@ -349,7 +400,7 @@ with tab_diagnosis:
                     else:
                         st.markdown(f"""
 <div class="css-card" style="border-left: 6px solid #2a9d8f; background-color: #f0fdf4;">
-    <h2 style="color: #2a9d8f !important; margin-top:0;">✅ Low Risk</h2>
+    <h2 style="color: #2a9d8f !important; margin-top:0;">✅ Low Risk (低风险)</h2>
     <p style="font-size: 1.1em;">Probability: <strong>{prob_pos*100:.1f}%</strong></p>
     <hr>
     <p><strong>💡 维持建议：</strong></p>
@@ -407,13 +458,13 @@ with tab_explain:
         try:
             st.image(f"assets/{img_name}", use_container_width=True)
         except:
-            st.warning("Missing Image")
+            st.warning("Missing Image (assets folder)")
     with c2:
         st.markdown("**ROC Curve**")
         try:
             st.image("assets/Test_ROC_Comparison.png", use_container_width=True)
         except:
-            st.warning("Missing Image")
+            st.warning("Missing Image (assets folder)")
             
     st.markdown("**Metrics Comparison**")
     try:
