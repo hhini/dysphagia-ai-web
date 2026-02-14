@@ -445,38 +445,93 @@ with tab_diagnosis:
     else:
         st.info("👈 请在左侧输入数据并点击 'Run Prediction'")
 # ------ 2. 分析 ------
+# ------ 2. 分析 (修复版：解决 'dict' object has no attribute 'named_steps') ------
 with tab_explain:
     st.markdown("### 🔍 Feature Importance")
-    model = models[selected_model_name]
+    
+    # 1. 获取加载的对象
+    loaded_object = models[selected_model_name]
+    
+    # 2. 提取真正的模型 (关键修复步骤)
+    model = None
+    if loaded_object is not None:
+        if isinstance(loaded_object, dict):
+            # 优先查找 'pipeline'，因为你的报错显示键名是这个
+            if 'pipeline' in loaded_object:
+                model = loaded_object['pipeline']
+            else:
+                # 如果不是 pipeline，尝试找其他常见的键
+                for key in ['model', 'clf', 'classifier', 'estimator']:
+                    if key in loaded_object:
+                        model = loaded_object[key]
+                        break
+        else:
+            # 如果不是字典，说明它本身就是模型
+            model = loaded_object
 
+    # 3. 开始绘图
     if model:
         try:
+            importances = None
+            
+            # --- A. 获取特征重要性数值 ---
+            # 尝试从 Pipeline 中获取最后一步的分类器
+            if hasattr(model, 'named_steps') and 'clf' in model.named_steps:
+                classifier = model.named_steps['clf']
+            elif hasattr(model, 'steps'):
+                # 如果没有名为 'clf' 的步骤，取最后一步
+                classifier = model.steps[-1][1]
+            else:
+                # 如果不是 Pipeline，直接就是分类器
+                classifier = model
+
+            # 根据模型类型提取系数
             if not is_rf:
-                importances = model.coef_[0] if hasattr(model, 'coef_') else model.named_steps['clf'].coef_[0]
-                feature_names = FEATURES_LR
+                # === 逻辑回归 (Logistic Regression) ===
+                if hasattr(classifier, 'coef_'):
+                    importances = classifier.coef_[0]
+                else:
+                    st.warning("⚠️ 无法从逻辑回归模型中提取系数 (coef_)")
+                
+                feature_names = FEATURES_LR # 10个特征
                 color_scale = 'RdBu_r'
             else:
-                importances = model.feature_importances_ if hasattr(model, 'feature_importances_') else model.named_steps['clf'].feature_importances_
-                feature_names = FEATURES_RF
+                # === 随机森林 (Random Forest) ===
+                if hasattr(classifier, 'feature_importances_'):
+                    importances = classifier.feature_importances_
+                else:
+                    st.warning("⚠️ 无法从随机森林模型中提取重要性 (feature_importances_)")
+                
+                feature_names = FEATURES_RF # 14个特征
                 color_scale = 'Viridis'
 
-            if len(importances) == len(feature_names):
-                df_imp = pd.DataFrame({'Feature': feature_names, 'Value': importances})
-                df_imp['AbsValue'] = df_imp['Value'].abs()
-                df_imp = df_imp.sort_values(by='AbsValue', ascending=True)
+            # --- B. 生成图表 ---
+            if importances is not None:
+                # 检查特征数量是否匹配
+                if len(importances) == len(feature_names):
+                    df_imp = pd.DataFrame({'Feature': feature_names, 'Value': importances})
+                    df_imp['AbsValue'] = df_imp['Value'].abs()
+                    df_imp = df_imp.sort_values(by='AbsValue', ascending=True)
 
-                fig_bar = px.bar(df_imp, x='Value', y='Feature', orientation='h',
-                                 title=f"Feature Contribution ({selected_model_name})",
-                                 color='Value', color_continuous_scale=color_scale)
-                fig_bar.update_layout(font=dict(color="black"), plot_bgcolor="rgba(0,0,0,0)")
-                st.plotly_chart(fig_bar, use_container_width=True)
-            else:
-                st.warning(f"Feature count mismatch: Model({len(importances)}) vs List({len(feature_names)})")
+                    fig_bar = px.bar(df_imp, x='Value', y='Feature', orientation='h',
+                                     title=f"Feature Contribution ({selected_model_name})",
+                                     color='Value', color_continuous_scale=color_scale)
+                    fig_bar.update_layout(font=dict(color="black"), plot_bgcolor="rgba(0,0,0,0)")
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                else:
+                    st.error(f"❌ 特征数量不匹配: 模型有 {len(importances)} 个系数，但定义的列表有 {len(feature_names)} 个。")
+                    st.write("模型期望的特征数:", len(importances))
+                    st.write("当前列表:", feature_names)
+
         except Exception as e:
-            st.error(f"Plot Error: {e}")
+            st.error(f"❌ 绘图错误: {e}")
+            st.info("提示：可能是模型结构复杂，无法自动提取 'clf' 层。")
+    else:
+        st.warning("无法加载模型对象，请检查 .pkl 文件。")
 
     st.divider()
     
+    # --- 图片显示部分 (保持不变) ---
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("**Confusion Matrix**")
@@ -499,7 +554,6 @@ with tab_explain:
         st.warning("Missing Image")
 
     st.markdown(HTML_ANALYSIS_REPORT, unsafe_allow_html=True)
-
 # ------ 3. 关于 ------
 with tab_about:
     st.markdown(HTML_ABOUT_SYSTEM, unsafe_allow_html=True)
